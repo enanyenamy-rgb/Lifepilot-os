@@ -1,0 +1,46 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.x'
+        channel: 'stable'
+
+    - name: Create Flutter Project Structure
+      run: |
+        # إنشاء مشروع مؤقت للحصول على ملفات الأندرويد والـ Gradle الأصلية
+        flutter create temp_app --org com.lifepilot --project-name lifepilot_os
+        
+        # نقل ملفات الأندرويد والـ ios والإعدادات إلى المستودع الرئيسي
+        cp -r temp_app/android ./
+        cp -r temp_app/ios ./
+        cp -r temp_app/web ./
+        cp temp_app/pubspec.yaml ./
+        
+        # التأكد من وجود مجلد lib الخاص بنا
+        mkdir -p lib
+
+    - name: Install Dependencies
+      run: flutter pub get
+
+    - name: Build APK
+      run: flutter build apk --release
