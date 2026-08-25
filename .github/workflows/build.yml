@@ -1,0 +1,46 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.5'
+          channel: 'stable'
+
+      - name: Create Android Structure & Build APK
+        run: |
+          # التأكد من جلب الحزم
+          flutter pub get
+          
+          # إن لم يكن مجلد أندرويد موجوداً، سيقوم فلاتر بإنشائه تلقائياً لمنع أي خطأ
+          if [ ! -d "android" ]; then
+            flutter create . --platforms=android --project-name=ai_phone
+          fi
+          
+          # بناء ملف الـ APK بنجاح تام
+          flutter build apk --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
