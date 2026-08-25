@@ -1,0 +1,217 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: 'stable'
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Force AiPhone Code & Build
+        run: |
+          # التأكد من اسم المشروع الصحيح
+          sed -i 's/^name:.*/name: ai_phone/' pubspec.yaml
+          
+          # إذا لم يكن مجلد lib موجوداً أو احتجنا لفرض الكود، سنقوم بتوليد القالب ثم كتابة واجهة Ai Phone الاحترافية مباشرة عبر السكريبت
+          flutter create . --platforms=android --project-name=ai_phone
+          
+          # حقن كود Ai Phone الاحترافي مباشرة لضمان عدم ظهور الشاشة الافتراضية القديمة
+          cat << 'EOF' > lib/main.dart
+          import 'package:flutter/material.dart';
+          import 'package:flutter/services.dart';
+
+          void main() {
+            WidgetsFlutterBinding.ensureInitialized();
+            SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+            runApp(const AiPhoneApp());
+          }
+
+          ValueNotifier<String> currentLanguage = ValueNotifier<String>('English');
+
+          class AiPhoneApp extends StatelessWidget {
+            const AiPhoneApp({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return ValueListenableBuilder<String>(
+                valueListenable: currentLanguage,
+                builder: (context, lang, child) {
+                  return MaterialApp(
+                    title: 'Ai Phone',
+                    debugShowCheckedModeBanner: false,
+                    themeMode: ThemeMode.dark,
+                    darkTheme: ThemeData(
+                      brightness: Brightness.dark,
+                      primarySwatch: Colors.orange,
+                      scaffoldBackgroundColor: const Color(0xFF121212),
+                      cardColor: const Color(0xFF1E1E1E),
+                      appBarTheme: const AppBarTheme(
+                        backgroundColor: Color(0xFF1F1F1F),
+                        elevation: 0,
+                      ),
+                    ),
+                    home: const MainHomeScreen(),
+                  );
+                },
+              );
+            }
+          }
+
+          class MainHomeScreen extends StatefulWidget {
+            const MainHomeScreen({super.key});
+
+            @override
+            State<MainHomeScreen> createState() => _MainHomeScreenState();
+          }
+
+          class _MainHomeScreenState extends State<MainHomeScreen> {
+            int _currentIndex = 0;
+            final List<Widget> _screens = [
+              const ExploreBrandsScreen(),
+              const CompareScreen(),
+              const UsedMarketScreen(),
+              const NewsAndVideosScreen(),
+              const SettingsScreen(),
+            ];
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                body: _screens[_currentIndex],
+                bottomNavigationBar: BottomNavigationBar(
+                  currentIndex: _currentIndex,
+                  onTap: (index) => setState(() => _currentIndex = index),
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: const Color(0xFF1F1F1F),
+                  selectedItemColor: Colors.orangeAccent,
+                  unselectedItemColor: Colors.grey,
+                  items: const [
+                    BottomNavigationBarItem(icon: Icon(Icons.phone_android), label: 'Brands'),
+                    BottomNavigationBarItem(icon: Icon(Icons.compare_arrows), label: 'Compare'),
+                    BottomNavigationBarItem(icon: Icon(Icons.storefront), label: 'Used Market'),
+                    BottomNavigationBarItem(icon: Icon(Icons.video_library), label: 'Media'),
+                    BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+                  ],
+                ),
+              );
+            }
+          }
+
+          class ExploreBrandsScreen extends StatelessWidget {
+            const ExploreBrandsScreen({super.key});
+            final List<Map<String, String>> brands = const [
+              {'name': 'Apple', 'models': '120+ Devices'},
+              {'name': 'Samsung', 'models': '350+ Devices'},
+              {'name': 'Xiaomi', 'models': '280+ Devices'},
+              {'name': 'Honor', 'models': '90+ Devices'},
+            ];
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Ai Phone - Global Brands')),
+                body: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search any smartphone or specs with AI...',
+                          prefixIcon: const Icon(Icons.search, color: Colors.orangeAccent),
+                          filled: true,
+                          fillColor: const Color(0xFF1E1E1E),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      Expanded(
+                        child: GridView.builder(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4),
+                          itemCount: brands.length,
+                          itemBuilder: (context, index) {
+                            return Card(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(brands[index]['name']!, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                                    const SizedBox(height: 8),
+                                    Text(brands[index]['models']!, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+
+          class CompareScreen extends StatelessWidget {
+            const CompareScreen({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(appBar: AppBar(title: const Text('Phone Comparison')), body: const Center(child: Text('Comparison Screen', style: TextStyle(color: Colors.orangeAccent))));
+            }
+          }
+
+          class UsedMarketScreen extends StatelessWidget {
+            const UsedMarketScreen({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(appBar: AppBar(title: const Text('Used Market (Residents Only - \$1 Price Unlock)')), body: const Center(child: Text('Used Market & Anti-Fraud Secure ID System', style: TextStyle(color: Colors.orangeAccent))));
+            }
+          }
+
+          class NewsAndVideosScreen extends StatelessWidget {
+            const NewsAndVideosScreen({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(appBar: AppBar(title: const Text('News & Media Reviews')), body: const Center(child: Text('Global Tech Reviews & Videos', style: TextStyle(color: Colors.orangeAccent))));
+            }
+          }
+
+          class SettingsScreen extends StatelessWidget {
+            const SettingsScreen({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(appBar: AppBar(title: const Text('Settings (25 Languages)')), body: const Center(child: Text('Settings & Languages', style: TextStyle(color: Colors.orangeAccent))));
+            }
+          }
+          EOF
+
+          flutter build apk --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
